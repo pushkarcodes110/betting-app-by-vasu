@@ -1,0 +1,218 @@
+# ==========================================
+# SENSITIVE FILES - NEVER COMMIT
+# ==========================================
+
+# Environment variables (CRITICAL)
+.env
+.env.*
+!.env.example
+*.env
+
+# SSH Keys and Certificates
+*.pem
+*.key
+*.pub
+id_rsa*
+google_cloud_key*
+*.ppk
+
+# Database files
+*.sqlite3
+*.db
+db.sqlite3
+*.sql
+*.dump
+
+# Secrets and credentials
+secrets.json
+credentials.json
+service-account*.json
+*.credentials
+
+# ==========================================
+# PYTHON
+# ==========================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# ==========================================
+# DJANGO
+# ==========================================
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Static and media files
+/staticfiles/
+/media/
+/static/
+/media/
+staticfiles/
+
+# Django migrations (optional - uncomment if you want to hide)
+# */migrations/*.py
+# !*/migrations/__init__.py
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# ==========================================
+# DEPLOYMENT & DOCKER
+# ==========================================
+
+# Docker volumes
+postgres_data/
+static_volume/
+media_volume/
+
+# ==========================================
+# IDE & EDITORS
+# ==========================================
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# ==========================================
+# OPERATING SYSTEM
+# ==========================================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+*.stackdump
+
+# ==========================================
+# TEMPORARY & CACHE FILES
+# ==========================================
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+tmp/
+
+# Cache directories
+.cache/
+__pycache__/
+.mypy_cache/
+
+# ==========================================
+# PROJECT SPECIFIC
+# ==========================================
+
+# Local configuration
+config.local.py
+settings_local.py
+local_settings.py
+
+# Test data
+test_data/
+
+# User uploads (if any)
+uploads/
+media/
+
+# Node modules (if using frontend tools)
+node_modules/
+
+# ==========================================
+# NEXT.JS (nextjs-app)
+# ==========================================
+
+# Dependencies
+nextjs-app/node_modules/
+
+# Next.js build output
+nextjs-app/.next/
+nextjs-app/out/
+nextjs-app/
+.playwright-mcp
+# Production build
+nextjs-app/build/
+
+# Debug logs
+nextjs-app/npm-debug.log*
+nextjs-app/yarn-debug.log*
+nextjs-app/yarn-error.log*
+
+# Env files
+nextjs-app/.env
+nextjs-app/.env.local
+nextjs-app/.env.development.local
+nextjs-app/.env.test.local
+nextjs-app/.env.production.local
+
+# Vercel
+nextjs-app/.vercel
+
+# TypeScript
+nextjs-app/*.tsbuildinfo
+nextjs-app/next-env.d.ts
+
+# Database (Prisma)
+nextjs-app/prisma/*.db
+nextjs-app/prisma/*.db-journal
+nextjs-app/*.sqlite3
+
+# Playwright MCP screenshots
+nextjs-app/.playwright-mcp/
+
+# ==========================================
+# END
+# ==========================================
