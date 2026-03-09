@@ -3,7 +3,6 @@ version: '3.8'
 services:
   db:
     image: postgres:16-alpine
-    container_name: betting_postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -21,13 +20,10 @@ services:
 
   web:
     build: .
-    container_name: betting_web
-    command: gunicorn mymainserver.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120
     volumes:
-      - static_volume:/app/staticfiles
       - media_volume:/app/media
-    ports:
-      - "3000:8000"
+    expose:
+      - "8000"
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
@@ -38,6 +34,15 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
+      - GUNICORN_THREADS=${GUNICORN_THREADS:-2}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
+      - GUNICORN_KEEPALIVE=${GUNICORN_KEEPALIVE:-2}
+      - GUNICORN_MAX_REQUESTS=${GUNICORN_MAX_REQUESTS:-500}
+      - GUNICORN_MAX_REQUESTS_JITTER=${GUNICORN_MAX_REQUESTS_JITTER:-50}
+      - GUNICORN_ACCESS_LOG=${GUNICORN_ACCESS_LOG:-false}
+      - DB_CONN_MAX_AGE=${DB_CONN_MAX_AGE:-60}
     depends_on:
       db:
         condition: service_healthy
@@ -47,7 +52,6 @@ services:
 
 volumes:
   postgres_data:
-  static_volume:
   media_volume:
 
 networks:

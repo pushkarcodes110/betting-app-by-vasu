@@ -28,11 +28,10 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-ewp)6*&#cx!)d%fd49=xs
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',') if h.strip()]
 
 # CSRF Settings
 CSRF_TRUSTED_ORIGINS = [
-    'http://35.200.208.215',
     'http://localhost',
     'http://127.0.0.1',
     'http://localhost:8000',
@@ -40,7 +39,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 # Add custom domains if provided
 if config('CSRF_TRUSTED_ORIGINS', default=''):
-    CSRF_TRUSTED_ORIGINS.extend(config('CSRF_TRUSTED_ORIGINS').split(','))
+    CSRF_TRUSTED_ORIGINS.extend([o.strip() for o in config('CSRF_TRUSTED_ORIGINS').split(',') if o.strip()])
 
 
 # Application definition
@@ -58,7 +57,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.middleware.gzip.GZipMiddleware',
     'django.middleware.http.ConditionalGetMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -102,13 +100,15 @@ WSGI_APPLICATION = 'mymainserver.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+DB_CONN_MAX_AGE = config('DB_CONN_MAX_AGE', default=60, cast=int)
+
 # Use PostgreSQL in Docker/production, SQLite for local development
 if 'DATABASE_URL' in os.environ:
     # Use DATABASE_URL if provided (Railway, Render, etc.)
     DATABASES = {
         'default': dj_database_url.config(
             default=os.environ.get('DATABASE_URL'),
-            conn_max_age=600,
+            conn_max_age=DB_CONN_MAX_AGE,
             conn_health_checks=True,
         )
     }
@@ -123,7 +123,7 @@ elif 'POSTGRES_HOST' in os.environ or 'POSTGRES_PASSWORD' in os.environ:
             'HOST': os.environ.get('POSTGRES_HOST', 'db'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
             'ATOMIC_REQUESTS': True,
-            'CONN_MAX_AGE': 600,
+            'CONN_MAX_AGE': DB_CONN_MAX_AGE,
             'OPTIONS': {
                 'connect_timeout': 10,
             },
@@ -194,9 +194,8 @@ CACHES = {
     }
 }
 
-# Session Configuration for Performance
-SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
-SESSION_CACHE_ALIAS = 'default'
+# Session Configuration for predictable memory usage across worker processes
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 1209600  # 2 weeks
 SESSION_SAVE_EVERY_REQUEST = False
 
@@ -219,6 +218,10 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = False  # Set to True when using HTTPS
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Trust reverse proxy headers from Coolify/Traefik.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
     # Disable HSTS for now, enable when HTTPS is confirmed working
     # SECURE_HSTS_SECONDS = 31536000  # 1 year
     # SECURE_HSTS_INCLUDE_SUBDOMAINS = True

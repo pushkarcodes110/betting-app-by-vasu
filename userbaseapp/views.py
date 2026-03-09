@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.cache import cache_page, cache_control
 from django.db import transaction, connection
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from decimal import Decimal
 import json
 import os
@@ -318,8 +318,7 @@ def master_delete_all_bets(request):
         
         # Delete all bets for this user
         with transaction.atomic():
-            deleted_count = Bet.objects.filter(user=user).count()
-            Bet.objects.filter(user=user).delete()
+            deleted_count = Bet.objects.filter(user=user).delete()[1].get(Bet._meta.label, 0)
             
             # Also delete bulk action history for this user
             BulkBetAction.objects.filter(user=user).delete()
@@ -369,13 +368,7 @@ def delete_bazar_bets(request):
                 user=user,
                 bazar=bazar,
                 bet_date=bet_date
-            ).count()
-            
-            Bet.objects.filter(
-                user=user,
-                bazar=bazar,
-                bet_date=bet_date
-            ).delete()
+            ).delete()[1].get(Bet._meta.label, 0)
             
             # Also delete bulk action history for this bazar and date
             BulkBetAction.objects.filter(
@@ -637,7 +630,7 @@ def place_bulk_bet(request):
         )
 
         # Create all bets
-        bets_created = []
+        bet_instances = []
         
         # Determine sub_type for tracking
         sub_type = None
@@ -692,7 +685,7 @@ def place_bulk_bet(request):
                             column_num = col_int
                             break
             
-            bet = Bet.objects.create(
+            bet_instances.append(Bet(
                 user=request.user,
                 number=str(number),
                 amount=amount,
@@ -702,16 +695,19 @@ def place_bulk_bet(request):
                 sub_type=sub_type,
                 bazar=bazar,
                 bet_date=bet_date
-            )
-            # Convert to IST for display
-            from django.utils import timezone as tz
-            local_time = tz.localtime(bet.created_at)
+            ))
+
+        created_bets = Bet.objects.bulk_create(bet_instances, batch_size=500)
+        bets_created = []
+        from django.utils import timezone as tz
+        for bet in created_bets:
+            local_time = tz.localtime(bet.created_at) if bet.created_at else tz.localtime(tz.now())
             bets_created.append({
                 'id': bet.id,
                 'number': bet.number,
                 'amount': str(bet.amount),
                 'bet_type': bet.bet_type,
-                'column': column_num,
+                'column': bet.column_number,
                 'created_at': local_time.strftime('%Y-%m-%d %I:%M:%S %p IST')
             })
 
@@ -917,18 +913,18 @@ def get_last_bulk_action(request):
 def get_bet_summary(request):
     """Get summary statistics for user's bets"""
     try:
-        user_bets = Bet.objects.filter(user=request.user)
-        
-        total_amount = sum(bet.amount for bet in user_bets)
-        total_bets = user_bets.count()
-        unique_numbers = user_bets.values('number').distinct().count()
+        summary = Bet.objects.filter(user=request.user).aggregate(
+            total_amount=Sum('amount'),
+            total_bets=Count('id'),
+            unique_numbers=Count('number', distinct=True),
+        )
         
         return JsonResponse({
             'success': True,
             'summary': {
-                'total_amount': str(total_amount),
-                'total_bets': total_bets,
-                'unique_numbers': unique_numbers
+                'total_amount': str(summary['total_amount'] or 0),
+                'total_bets': summary['total_bets'] or 0,
+                'unique_numbers': summary['unique_numbers'] or 0
             }
         })
     except Exception as e:
@@ -1017,7 +1013,7 @@ def get_bulk_action_history(request):
         date_str = request.GET.get('date', None)
         
         # Start with base query
-        bulk_actions = BulkBetAction.objects.filter(user=request.user).select_related('user')
+        bulk_actions = BulkBetAction.objects.filter(user=request.user)
         
         # Apply bazar filter if provided
         if bazar:
@@ -1308,11 +1304,8 @@ def place_motar_bet(request):
         )
         
         # Create bets and track IDs for undo functionality
-        bet_ids = []
-        bets_created = []
-        
-        for number in numbers:
-            bet = Bet.objects.create(
+        created_bets = Bet.objects.bulk_create([
+            Bet(
                 user=request.user,
                 number=str(number),
                 amount=amount,
@@ -1321,12 +1314,14 @@ def place_motar_bet(request):
                 bazar=bazar,
                 bet_date=bet_date
             )
-            bet_ids.append(bet.id)
-            bets_created.append({
-                'bet_id': bet.id,
-                'number': bet.number,
-                'amount': str(bet.amount)
-            })
+            for number in numbers
+        ], batch_size=500)
+        bet_ids = [bet.id for bet in created_bets]
+        bets_created = [{
+            'bet_id': bet.id,
+            'number': bet.number,
+            'amount': str(bet.amount)
+        } for bet in created_bets]
         
         return JsonResponse({
             'success': True,
@@ -1406,11 +1401,8 @@ def place_comman_pana_bet(request):
         )
         
         # Create bets and track IDs for undo functionality
-        bet_ids = []
-        bets_created = []
-        
-        for number in numbers:
-            bet = Bet.objects.create(
+        created_bets = Bet.objects.bulk_create([
+            Bet(
                 user=request.user,
                 number=str(number),
                 amount=amount,
@@ -1419,12 +1411,14 @@ def place_comman_pana_bet(request):
                 bazar=bazar,
                 bet_date=bet_date
             )
-            bet_ids.append(bet.id)
-            bets_created.append({
-                'bet_id': bet.id,
-                'number': bet.number,
-                'amount': str(bet.amount)
-            })
+            for number in numbers
+        ], batch_size=500)
+        bet_ids = [bet.id for bet in created_bets]
+        bets_created = [{
+            'bet_id': bet.id,
+            'number': bet.number,
+            'amount': str(bet.amount)
+        } for bet in created_bets]
         
         return JsonResponse({
             'success': True,
@@ -1497,11 +1491,8 @@ def place_set_pana_bet(request):
         )
         
         # Create bets for all numbers in the family
-        bet_ids = []
-        bets_created = []
-        
-        for num in family_numbers:
-            bet = Bet.objects.create(
+        created_bets = Bet.objects.bulk_create([
+            Bet(
                 user=request.user,
                 number=str(num),
                 amount=amount,
@@ -1510,12 +1501,14 @@ def place_set_pana_bet(request):
                 bazar=bazar,
                 bet_date=bet_date
             )
-            bet_ids.append(bet.id)
-            bets_created.append({
-                'bet_id': bet.id,
-                'number': bet.number,
-                'amount': str(bet.amount)
-            })
+            for num in family_numbers
+        ], batch_size=500)
+        bet_ids = [bet.id for bet in created_bets]
+        bets_created = [{
+            'bet_id': bet.id,
+            'number': bet.number,
+            'amount': str(bet.amount)
+        } for bet in created_bets]
         
         return JsonResponse({
             'success': True,
@@ -1606,11 +1599,8 @@ def place_group_bet(request):
         )
         
         # Create bets for all matching numbers
-        bet_ids = []
-        bets_created = []
-        
-        for num in matching_numbers:
-            bet = Bet.objects.create(
+        created_bets = Bet.objects.bulk_create([
+            Bet(
                 user=request.user,
                 number=num,
                 amount=amount,
@@ -1619,12 +1609,14 @@ def place_group_bet(request):
                 bazar=bazar,
                 bet_date=bet_date
             )
-            bet_ids.append(bet.id)
-            bets_created.append({
-                'bet_id': bet.id,
-                'number': bet.number,
-                'amount': str(bet.amount)
-            })
+            for num in matching_numbers
+        ], batch_size=500)
+        bet_ids = [bet.id for bet in created_bets]
+        bets_created = [{
+            'bet_id': bet.id,
+            'number': bet.number,
+            'amount': str(bet.amount)
+        } for bet in created_bets]
         
         return JsonResponse({
             'success': True,
@@ -1757,20 +1749,20 @@ def get_column_totals(request):
     try:
         bazar = request.GET.get('bazar')
         bet_date = request.GET.get('date')
-        
-        # Get totals for each column
-        column_totals = {}
-        for col in range(1, 11):
-            total = Bet.objects.filter(
-                user=request.user,
-                bet_type='COLUMN',
-                column_number=col,
-                bazar=bazar,
-                bet_date=bet_date,
-                is_deleted=False
-            ).aggregate(total=Sum('amount'))['total'] or 0
-            
-            column_totals[col] = float(total)
+
+        column_totals = {col: 0.0 for col in range(1, 11)}
+        totals = Bet.objects.filter(
+            user=request.user,
+            bet_type='COLUMN',
+            bazar=bazar,
+            bet_date=bet_date,
+            is_deleted=False
+        ).values('column_number').annotate(total=Sum('amount'))
+
+        for row in totals:
+            col = row.get('column_number')
+            if col in column_totals:
+                column_totals[col] = float(row['total'] or 0)
         
         return JsonResponse({
             'success': True,
@@ -1805,7 +1797,7 @@ def place_quick_bets(request):
             from datetime import datetime
             bet_date = datetime.fromisoformat(date_str).date()
 
-        created_bets = []
+        valid_bets = []
         errors = []
 
         for bet_item in bets:
@@ -1825,27 +1817,29 @@ def place_quick_bets(request):
                 # Pad number to 3 digits
                 number_str = str(number).zfill(3)
 
-                bet = Bet.objects.create(
+                valid_bets.append(Bet(
                     user=request.user,
                     number=number_str,
                     amount=amount,
                     bet_type='SINGLE',
                     bazar=bazar,
                     bet_date=bet_date
-                )
-                created_bets.append({
-                    'id': bet.id,
-                    'number': bet.number,
-                    'amount': str(bet.amount)
-                })
+                ))
             except Exception as e:
                 errors.append({'number': number, 'error': str(e)})
+
+        created_bets = Bet.objects.bulk_create(valid_bets, batch_size=500) if valid_bets else []
+        created_bets_data = [{
+            'id': bet.id,
+            'number': bet.number,
+            'amount': str(bet.amount)
+        } for bet in created_bets]
 
         return JsonResponse({
             'success': len(created_bets) > 0,
             'message': f'{len(created_bets)} bet(s) placed successfully',
             'bets_placed': len(created_bets),
-            'created_bets': created_bets,
+            'created_bets': created_bets_data,
             'errors': errors
         })
 

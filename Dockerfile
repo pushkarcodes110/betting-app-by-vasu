@@ -1,44 +1,27 @@
-# Use Python 3.12 slim image
 FROM python:3.12-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Set work directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
-    gcc \
-    python3-dev \
-    musl-dev \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
-COPY requirements.txt /app/
+COPY requirements.txt /app/requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install -r /app/requirements.txt
 
-# Copy project
 COPY . /app/
 
-# Copy entrypoint script
-COPY entrypoint.sh /app/
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && \
+    mkdir -p /app/staticfiles && \
+    python manage.py collectstatic --noinput
 
-# Create directory for static files
-RUN mkdir -p /app/staticfiles
-
-# Collect static files
-RUN python manage.py collectstatic --noinput || true
-
-# Expose port
 EXPOSE 8000
 
-# Run entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"]
