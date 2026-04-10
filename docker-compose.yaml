@@ -23,7 +23,7 @@ services:
     volumes:
       - media_volume:/app/media
     expose:
-      - "8000:8000" 
+      - "8000"
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
